@@ -3,10 +3,11 @@
 #include <future>
 #include <iostream>
 #include <numeric>
-
 #include <zmqpp/zmqpp.hpp>
 #include <pistache/endpoint.h>
+
 #include "hMonitor.h"
+#include "signer.h"
 
 using namespace std;
 
@@ -52,7 +53,7 @@ class SubSystemStatusHandler : public Http::Handler
 };
 
 //command processor
-static void waitForCmd(zmqpp::socket& socket)
+static void waitForCmd(zmqpp::socket& socket, Signer& signer)
 {    
   string line;
   while (true)
@@ -61,7 +62,8 @@ static void waitForCmd(zmqpp::socket& socket)
     if (line == "s")
     {
       auto message = hMonitor::protocol::stopMsg + to_string(time(nullptr));
-      socket.send(message);
+      auto hexMsg = signer.addSignature(message);
+      socket.send(hexMsg.c_str());
 
       string buffer;
       socket.receive(buffer); //TODO: ACK with error code
@@ -98,18 +100,22 @@ int main(int argc, char *argv[])
   zmqpp::socket socketHb(context, zmqpp::socket_type::req);
   zmqpp::socket socketCmd(context, zmqpp::socket_type::req);
 
+  Signer signer(hMonitor::seedKey, hMonitor::signBuffSz);
+
   // open the connection
   cout << "Connecting…" << endl;
   socketHb.connect(hbEndpoint);
   socketCmd.connect(cmdEndpoint);
   cout << "Type `s`+ Enter to stop all subsystems…" << endl << flush;
-  std::thread sendCmdThread(waitForCmd, std::ref(socketCmd));
+  std::thread sendCmdThread(waitForCmd, std::ref(socketCmd), std::ref(signer));
+
   while (true)
   {
     // send a message
     cout << "Sending heartbeat msg… ";    
-    string msg = hMonitor::protocol::heartbeatMsg + to_string(time(nullptr));
-    socketHb.send(msg);
+    auto msg = hMonitor::protocol::heartbeatMsg + to_string(time(nullptr));
+    auto hexMsg = signer.addSignature(msg);
+    socketHb.send(hexMsg.c_str());
 
     string buffer;
     socketHb.receive(buffer);

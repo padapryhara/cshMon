@@ -5,7 +5,7 @@ namespace hMonitor
   const static unsigned int heartbeatPort = 12277;
   const static unsigned int commandPort = 12278;
   const static unsigned int webServerPort = 9080;
-  const static unsigned int signBuffSz = 128;
+  const static unsigned int signBuffSz = 256;
   
   const static std::string seedKey = "A special seed sequence for hMon"; //seed for public key generation (instead of exchange)
 

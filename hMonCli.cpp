@@ -6,6 +6,7 @@
 #include <zmqpp/zmqpp.hpp>
 
 #include "hMonitor.h"
+#include "signer.h"
 
 using namespace std;
 namespace pt = boost::property_tree;
@@ -32,6 +33,7 @@ int main(int argc, char *argv[])
   socketHb.bind(hbEndpoint);
   socketCmd.bind(cmdEndpoint);
 
+  Signer signer(hMonitor::seedKey, hMonitor::signBuffSz);
   while (true)
   {
     if (isSubSystemsOn)
@@ -40,14 +42,18 @@ int main(int argc, char *argv[])
       subSystemStatus2 = getRandStatus();
     }
 
-    string text;
-    zmqpp::message message;
-    if (socketHb.receive(message, true)) //heartbeat
+    string hexMessage, messageText;
+    if (socketHb.receive(hexMessage, true)) //heartbeat
     {
-      message >> text;
-      if (text.find(hMonitor::protocol::heartbeatMsg) == 0)
+      if (!signer.checkSignature(hexMessage, messageText))
       {
-        auto tmStamp = text.substr(hMonitor::protocol::heartbeatMsg.length());
+        cout << "Error: sign check was failed" << endl;
+        socketHb.send(string(""));
+        continue;        
+      }
+      if (messageText.find(hMonitor::protocol::heartbeatMsg) == 0)
+      {
+        auto tmStamp = messageText.substr(hMonitor::protocol::heartbeatMsg.length());
         cout << "heartbeat timestamp: " << tmStamp << endl;
 
         pt::ptree tree;
@@ -62,12 +68,17 @@ int main(int argc, char *argv[])
       }
     }
     
-    if (socketCmd.receive(message, true)) //command
+    if (socketCmd.receive(hexMessage, true)) //command
     {
-      message >> text;
-      if (text.find(hMonitor::protocol::stopMsg) == 0)
+      if (!signer.checkSignature(hexMessage, messageText))
       {
-        auto tmStamp = text.substr(hMonitor::protocol::stopMsg.length());
+        cout << "Error: sign check was failed" << endl;
+        socketHb.send(string(""));
+        continue;        
+      }
+      if (messageText.find(hMonitor::protocol::stopMsg) == 0)
+      {
+        auto tmStamp = messageText.substr(hMonitor::protocol::stopMsg.length());
         cout << "stop timestamp: " << tmStamp << endl;
 
         isSubSystemsOn = false;
