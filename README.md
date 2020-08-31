@@ -14,12 +14,12 @@
 
 ## usage / test case
 
-*server side:*
+*client side:*
 ```shell
 ./build/hmoncli
 ```
 
-*client side:*
+*server side:*
 ```shell
 
 ./build/hmonsrv 127.0.0.1 #or client's IP in case of 2 peers
